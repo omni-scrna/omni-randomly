@@ -8,7 +8,12 @@ from matplotlib import style
 from sklearn.decomposition import PCA
 
 import multiprocessing
-from MulticoreTSNE import MulticoreTSNE
+# VENDORED-PATCH: MulticoreTSNE has a finicky CMake-based build and is
+# only used by the TSNE plotting helper. Make it optional.
+try:
+    from MulticoreTSNE import MulticoreTSNE
+except ModuleNotFoundError:
+    MulticoreTSNE = None
 import numpy as np
 import pandas as pd
 import seaborn as sns
