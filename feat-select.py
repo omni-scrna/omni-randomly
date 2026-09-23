@@ -23,10 +23,10 @@ import h5py
 import numpy as np
 import pandas as pd
 from scipy import sparse
-from randomly import Rm
+from randomly_fast import RmFast
 
-# ponytail: CPU ceiling, two dense n^2 float64 Wisharts + full eigh. Lift when
-# the RmFast (cupy) GPU arm lands.
+# ponytail: CPU ceiling, two dense n^2 float64 Wisharts + full eigh. The cupy
+# backend is bounded by VRAM instead and fails loudly on OOM.
 MAX_CELLS = 20000
 
 
@@ -41,6 +41,8 @@ def parse_args():
     p.add_argument("--properties_info", nargs="+", required=True)
     p.add_argument("--fdr", type=float, required=True,
                    help="false discovery rate for signal genes, in (0, 1)")
+    p.add_argument("--backend", choices=["numpy", "cupy"], default="numpy",
+                   help="eigh on CPU (scipy) or GPU (cupy, float64)")
     return p.parse_args()
 
 
@@ -67,13 +69,22 @@ def write_tenx(path, m, genes, cells):
         g["barcodes"] = np.array(cells, dtype="S")
 
 
-def select_genes(counts, fdr):
+def load_counts(rawdata_h5ad, cells, genes):
+    """rawdata layers["counts"] subset to (cells, genes) -> cells x genes DataFrame."""
+    raw = ad.read_h5ad(rawdata_h5ad)
+    if "counts" not in raw.layers:
+        raise ValueError("randomly needs raw counts in rawdata_h5ad layers['counts']")
+    x = raw[cells, genes].layers["counts"]
+    x = x.toarray() if sparse.issparse(x) else np.asarray(x)
+    return pd.DataFrame(x, index=cells, columns=genes)
+
+
+def select_genes(counts, fdr, backend="numpy"):
     """counts: cells x genes DataFrame of raw counts -> list of selected genes."""
-    # ponytail: fixed seed. Rm ignores its random_state; the shuffle behind the
-    # MP fit draws from numpy's global RNG and moves lambda_c, hence the genes.
+    # ponytail: fixed seed. The shuffle behind the MP fit moves lambda_c, hence
+    # the genes; RmFast draws it from its own Generator, the same on both backends.
     # TODO: expose as a random_seed plan parameter for the seed factorial.
-    np.random.seed(0)
-    rm = Rm()
+    rm = RmFast(backend=backend, shuffle_seed=0)
     rm.preprocess(counts)
     rm.fit()
     print(f"signal components above Tracy-Widom: {rm.n_components}")
@@ -87,18 +98,12 @@ def main():
 
     norm, genes, cells = read_tenx(args.normalized_h5[0])
     print(f"normalized_h5 (genes x cells): {norm.shape}")
-    if len(cells) > MAX_CELLS:
+    if args.backend == "numpy" and len(cells) > MAX_CELLS:
         raise ValueError(f"{len(cells)} cells > MAX_CELLS={MAX_CELLS}: the n_cells^2 "
                          "Wishart does not fit on CPU; use the GPU arm")
 
-    raw = ad.read_h5ad(args.rawdata_h5ad[0])
-    if "counts" not in raw.layers:
-        raise ValueError("randomly needs raw counts in rawdata_h5ad layers['counts']")
-    x = raw[cells, genes].layers["counts"]
-    x = x.toarray() if sparse.issparse(x) else np.asarray(x)
-    counts = pd.DataFrame(x, index=cells, columns=genes)
-
-    selected = set(select_genes(counts, args.fdr))
+    counts = load_counts(args.rawdata_h5ad[0], cells, genes)
+    selected = set(select_genes(counts, args.fdr, args.backend))
     keep = np.array([g in selected for g in genes])
     print(f"selected {keep.sum()} / {len(genes)} genes at fdr={args.fdr}")
     if not keep.any():

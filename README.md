@@ -19,5 +19,10 @@ pixi run python feat-select.py --output_dir out --name <dataset> \
   --properties_info <d>_properties.yaml --fdr 0.001
 ```
 
+`--backend cupy` runs the eigh on the GPU (`pixi run -e gpu ...`, linux-64,
+float64). It reproduces the CPU gene set exactly; at 5k cells it is not faster.
+`randomly_fast.py` (`RmFast`) also replaces upstream's per-column shuffle loop;
+`pixi run -e gpu agreement` checks it against upstream `Rm` and CPU vs GPU.
+
 Cost is O(n_cells²) memory and O(n_cells³) time; runs above 20000 cells are
 refused (`MAX_CELLS`). tenx-0005k (4925 cells): 28 s, 3.1 GB peak RSS.
