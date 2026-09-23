@@ -1,4 +1,5 @@
 # OmniBenchmark Module Configuration
 
 entrypoints:
-  default: run.py
+  default: feat-select.py   # alias for the primary entrypoint
+  select: feat-select.py
