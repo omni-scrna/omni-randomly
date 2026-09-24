@@ -3,7 +3,7 @@ message: "If you use this module in your publication, please cite as below."
 type: software
 title: "Randomly"
 abstract: |
-  Random Matrix Theory gene selection via RabadanLab/randomly
+  Random Matrix Theory dimensionality reduction via RabadanLab/randomly
 authors:
   - family-names: "carrillo"
     given-names: "ben"

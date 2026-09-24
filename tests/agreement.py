@@ -1,10 +1,10 @@
 """RmFast agrees with upstream Rm, and its cupy backend with its numpy one.
 
     pixi run -e gpu python tests/agreement.py                          # synthetic smoke
-    pixi run -e gpu python tests/agreement.py RAW.h5ad NORMALIZED.h5   # real counts
+    pixi run -e gpu python tests/agreement.py NORMALIZED.h5            # real data
 
 The synthetic data is a smoke test only: its planted programmes leave no genes
-near the FDR threshold, so it cannot see float32 drift. Real counts can
+near the FDR threshold, so it cannot see float32 drift. Real data can
 (tenx-0005k: float32 moved 5 of 3805 genes), so run the second form before
 changing RmFast.
 
@@ -42,19 +42,21 @@ def make_counts(n_cells=3000, n_genes=1000, seed=0):
                         columns=[f"g{j}" for j in range(n_genes)])
 
 
-def real_counts(rawdata_h5ad, normalized_h5):
-    spec = importlib.util.spec_from_file_location("feat_select", ROOT / "feat-select.py")
-    fs = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fs)
-    _, genes, cells = fs.read_tenx(normalized_h5)
-    return fs.load_counts(rawdata_h5ad, cells, genes)
+def real_normalized(normalized_h5):
+    spec = importlib.util.spec_from_file_location("ndimr", ROOT / "ndimr.py")
+    nd = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(nd)
+    return nd.read_tenx(normalized_h5)
 
 
-def run(rm, df, np_seed=None):
+def run(rm, df, np_seed=None, counts=True):
     if np_seed is not None:
         np.random.seed(np_seed)  # upstream's shuffle draws from the global RNG
-    rm.preprocess(df.copy())
-    rm.fit()
+    if counts:
+        rm.preprocess(df.copy())
+        rm.fit()
+    else:  # already normalized: upstream's non-preprocessed branch
+        rm.fit(df.copy())
     return rm, set(rm.select_genes(fdr=FDR))
 
 
@@ -63,12 +65,13 @@ def jaccard(a, b):
 
 
 def main():
-    df = real_counts(*sys.argv[1:3]) if len(sys.argv) == 3 else make_counts()
-    print(f"counts: {df.shape[0]} cells x {df.shape[1]} genes")
+    counts = len(sys.argv) != 2
+    df = make_counts() if counts else real_normalized(sys.argv[1])
+    print(f"data: {df.shape[0]} cells x {df.shape[1]} genes")
 
-    ref0, g_ref0 = run(Rm(), df, np_seed=0)
-    ref1, g_ref1 = run(Rm(), df, np_seed=1)
-    cpu, g_cpu = run(RmFast(backend="numpy", shuffle_seed=0), df)
+    ref0, g_ref0 = run(Rm(), df, np_seed=0, counts=counts)
+    ref1, g_ref1 = run(Rm(), df, np_seed=1, counts=counts)
+    cpu, g_cpu = run(RmFast(backend="numpy", shuffle_seed=0), df, counts=counts)
     spread = jaccard(g_ref0, g_ref1)
     print(f"upstream seed 0 vs 1: n_comp {ref0.n_components}/{ref1.n_components}, "
           f"genes {len(g_ref0)}/{len(g_ref1)}, jaccard {spread:.4f}")
@@ -82,7 +85,7 @@ def main():
         print("no CUDA device: GPU agreement skipped")
         return
     for dtype in ("float64", "float32"):
-        gpu, g_gpu = run(RmFast(backend="cupy", dtype=dtype, shuffle_seed=0), df)
+        gpu, g_gpu = run(RmFast(backend="cupy", dtype=dtype, shuffle_seed=0), df, counts=counts)
         rel = np.max(np.abs(gpu.L - cpu.L)) / np.max(np.abs(cpu.L))
         print(f"RmFast-cupy {dtype} vs numpy: max rel eig err {rel:.2e}, n_comp "
               f"{gpu.n_components}/{cpu.n_components}, genes {len(g_gpu)}/{len(g_cpu)}, "
