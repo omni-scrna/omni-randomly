@@ -3,3 +3,5 @@ commit: e8730f8041bfd42da33e09f422c0e94378430a06
 why vendored: upstream imports MulticoreTSNE at load time; its PyPI sdist no
   longer builds and conda-forge's multicore-tsne is py310-only with a version
   string pixi cannot parse. Only randomly.py is used; tSNE plotting is not.
+patches (marked VENDORED-PATCH): the MulticoreTSNE and seaborn imports are
+  optional; both are only used by plotting helpers the module never calls.

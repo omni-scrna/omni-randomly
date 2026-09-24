@@ -16,7 +16,12 @@ except ModuleNotFoundError:
     MulticoreTSNE = None
 import numpy as np
 import pandas as pd
-import seaborn as sns
+# VENDORED-PATCH: seaborn is only used by the plotting/style helpers.
+# Make it optional.
+try:
+    import seaborn as sns
+except ModuleNotFoundError:
+    sns = None
 
 from collections import defaultdict
 from scipy.cluster import hierarchy

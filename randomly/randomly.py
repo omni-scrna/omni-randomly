@@ -14,7 +14,12 @@ from matplotlib.offsetbox import AnchoredText
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
 
-import seaborn as sns
+# VENDORED-PATCH: seaborn is only used by the plotting/style helpers.
+# Make it optional.
+try:
+    import seaborn as sns
+except ModuleNotFoundError:
+    sns = None
 
 import warnings
 
