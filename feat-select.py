@@ -16,6 +16,7 @@ Cost is O(n_cells^2) memory and O(n_cells^3) time, twice (data + shuffle).
 """
 
 import argparse
+import sys
 from pathlib import Path
 
 import anndata as ad
@@ -25,6 +26,9 @@ import pandas as pd
 from scipy import sparse
 from randomly_fast import RmFast
 
+sys.path.insert(0, str(Path(__file__).parent / "src"))  # vendored `common` (src/common)
+from common import cli  # noqa: E402
+
 # ponytail: CPU ceiling, two dense n^2 float64 Wisharts + full eigh. The cupy
 # backend is bounded by VRAM instead and fails loudly on OOM.
 MAX_CELLS = 20000
@@ -32,13 +36,8 @@ MAX_CELLS = 20000
 
 def parse_args():
     p = argparse.ArgumentParser(description="FEAT module: randomly")
-    p.add_argument("--output_dir", required=True)
-    p.add_argument("--name", required=True)
-    p.add_argument("--rawdata_h5ad", nargs="+", required=True)
-    p.add_argument("--normalized_h5", nargs="+", required=True)
-    p.add_argument("--filtered_cellids", nargs="+", required=True)
-    p.add_argument("--filtered_featureids", nargs="+", required=True)
-    p.add_argument("--properties_info", nargs="+", required=True)
+    cli.add_base_args(p)              # --output_dir, --name
+    cli.add_stage_args(p, "FEAT")     # the FEAT stage I/O, from the plan's schema
     p.add_argument("--fdr", type=float, required=True,
                    help="false discovery rate for signal genes, in (0, 1)")
     p.add_argument("--backend", choices=["numpy", "cupy"], default="numpy",
@@ -96,13 +95,13 @@ def main():
     if not 0 < args.fdr < 1:
         raise ValueError(f"--fdr must be in (0, 1), got {args.fdr}")
 
-    norm, genes, cells = read_tenx(args.normalized_h5[0])
+    norm, genes, cells = read_tenx(args.normalized_h5)
     print(f"normalized_h5 (genes x cells): {norm.shape}")
     if args.backend == "numpy" and len(cells) > MAX_CELLS:
         raise ValueError(f"{len(cells)} cells > MAX_CELLS={MAX_CELLS}: the n_cells^2 "
                          "Wishart does not fit on CPU; use the GPU arm")
 
-    counts = load_counts(args.rawdata_h5ad[0], cells, genes)
+    counts = load_counts(args.rawdata_h5ad, cells, genes)
     selected = set(select_genes(counts, args.fdr, args.backend))
     keep = np.array([g in selected for g in genes])
     print(f"selected {keep.sum()} / {len(genes)} genes at fdr={args.fdr}")

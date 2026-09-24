@@ -8,8 +8,11 @@ Fits on raw counts (`rawdata_h5ad` `layers["counts"]`, subset to the cells and
 genes of `normalized_h5`), selects genes at `--fdr`, writes `normalized_h5`
 restricted to them. The number of genes is decided by the method.
 
-`randomly/` is upstream `e8730f8` vendored, with one patch making the
-MulticoreTSNE import optional (see `randomly/UPSTREAM`).
+`randomly/` is upstream `e8730f8` vendored, patched so the MulticoreTSNE and
+seaborn imports are optional (see `randomly/UPSTREAM`).
+
+The shared args (`--output_dir`, `--name` and the FEAT stage I/O) come from the
+plan's JSON schemas shipped in `src/common/`; `pixi run -e dev sync` refreshes them.
 
 ```bash
 pixi run check
