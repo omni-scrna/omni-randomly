@@ -215,9 +215,13 @@ class Rm(Visualize, Cluster):
         if self.eigen_solver == 'wishart':
             Y = self._wishart_matrix(self.X)
             (self.L, self.V) = self._get_eigen(Y)
+            # VENDORED-PATCH: drop each n_cells x n_cells Wishart once decomposed
+            del Y
             Xr = self._random_matrix(self.X)
             Yr = self._wishart_matrix(Xr)
+            del Xr
             (self.Lr, self.Vr) = self._get_eigen(Yr)
+            del Yr
 
             self.explained_variance_ = (self.L**2) / (self.n_cells)
             self.total_variance_ = self.explained_variance_.sum()
@@ -259,15 +263,17 @@ class Rm(Visualize, Cluster):
         self._snr = np.square(noise_right_projected_genes).sum(axis=1)
 
         self.components_genes = dict()
+        # VENDORED-PATCH: the noise max is loop-invariant; upstream recomputed it
+        # (genes x noise components, single-threaded) once per component.
+        noise_max = 10 * np.max(np.square(noise_projected_genes), axis=1)
         for j in range(self.n_components):
             self.components_genes[j] = np.array(self.normal_genes)[
-                np.square(signal_projected_genes[:, -j - 1])
-                > 10 * np.max(np.square(noise_projected_genes),
-                              axis=1)
+                np.square(signal_projected_genes[:, -j - 1]) > noise_max
             ]
 
-        self.X = np.dot(np.dot(Vs, Vs.T),
-                        self.X)
+        # VENDORED-PATCH: Vs (Vs^T X), not (Vs Vs^T) X: same projection without
+        # the n_cells x n_cells intermediate.
+        self.X = np.dot(Vs, np.dot(Vs.T, self.X))
         # X = U S V^T= U(V S)^T = U (X^T U)^T = U U^T X ~ Us Us^T X
 
     def return_cleaned(self,

@@ -29,9 +29,12 @@ from randomly_fast import RmFast
 sys.path.insert(0, str(Path(__file__).parent / "src"))  # vendored `common` (src/common)
 from common import cli  # noqa: E402
 
-# ponytail: CPU ceiling, two dense n^2 float64 Wisharts + full eigh. The cupy
-# backend is bounded by VRAM instead and fails loudly on OOM.
-MAX_CELLS = 20000
+# ponytail: CPU ceiling. Measured on tenx-0020k subsamples (5k/10k/15k cells,
+# ~17k genes): peak RSS ~ 2.4 n^2 + 5.8 n*g float64 (Wisharts + eigh vs. dense
+# counts copies), fit time ~ n^3 (15k: 8 min). 40k cells ~ 60 GB, ~2.5 h, under
+# an 80 GB job with room for more genes. The cupy backend is bounded by VRAM
+# instead and fails loudly on OOM.
+MAX_CELLS = 40000
 
 
 def parse_args():

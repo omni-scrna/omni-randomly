@@ -27,5 +27,12 @@ float64). It reproduces the CPU gene set exactly; at 5k cells it is not faster.
 `randomly_fast.py` (`RmFast`) also replaces upstream's per-column shuffle loop;
 `pixi run -e gpu agreement` checks it against upstream `Rm` and CPU vs GPU.
 
-Cost is O(n_cells²) memory and O(n_cells³) time; runs above 20000 cells are
-refused (`MAX_CELLS`). tenx-0005k (4925 cells): 28 s, 3.1 GB peak RSS.
+Cost is O(n_cells²) memory and O(n_cells³) time; CPU runs above 40000 cells
+are refused (`MAX_CELLS`). Measured fit on tenx-0020k subsamples (~17k genes):
+
+| cells | fit time | peak RSS |
+|---|---|---|
+| 5 000 | 27 s | 4.0 GB |
+| 10 000 | 2.8 min | 9.0 GB |
+| 15 000 | 8.1 min | 15.4 GB |
+| 40 000 (projected) | ~2.5 h | ~60 GB |
