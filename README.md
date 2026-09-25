@@ -12,6 +12,13 @@ noise ends, so it writes what the PCA stage writes: `{name}_embedding.tsv`
 (`cell_id`, `PC1..PCk`) and `{name}_loadings.tsv` (`gene`, `PC1..PCk`);
 `tests/pca_equivalence.py` checks both against sklearn's PCA.
 
+Input: upstream's own preprocessing is just log2(1 + CPM) followed by a per-gene
+z-score, and the z-score happens inside the fit. So on a log-normalize NORM arm
+(`normalize_total` + `log1p`) this is randomly's published pipeline, up to the
+scale factor (1e6 there), which sets how hard the pseudocount bends low counts.
+On non-log normalizations (pearson residuals, scran without the log) the
+Marchenko-Pastur null is untested.
+
 `randomly/` is upstream `e8730f8` vendored and patched (see `randomly/UPSTREAM`).
 
 The shared args (`--output_dir`, `--name` and the NDIMR stage I/O) come from the
